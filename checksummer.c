@@ -23,7 +23,6 @@
 #define LOG_MASK   (\
                      LOG_INFO      |    \
                      LOG_ERROR     |    \
-                     LOG_ADDR      |    \
                   /* LOG_ADDR      | */ \
                      LOG_SCAN      |    \
                      0\
@@ -42,10 +41,102 @@ typedef uint32_t addr_t;
 addr_t * address_list;
 
 typedef struct image_s{
-	char * fname;
-	void * map;
-	addr_t size;
+	char    * fname;
+	uint8_t * map;
+	addr_t    size;
 } image_t;
+
+typedef void(*checksum_fp_t)
+	(addr_t as, addr_t ae, image_t * img, uint8_t * byte_len, void ** result);
+
+void sum32(addr_t as, addr_t ae, image_t * img, uint8_t * byte_len, void ** result)
+{
+	static uint32_t sum32;
+	*byte_len = 4;
+	addr_t a;
+	sum32 = 0;
+	for (a=as; a<ae; a++)
+		sum32 += img->map[a];
+	*result = &sum32;
+}
+
+void adler32(addr_t as, addr_t ae, image_t * img, uint8_t * byte_len, void ** result)
+{
+	static uint32_t a32 = 0;
+	*byte_len = 4;
+	uint32_t s1 = 1;
+	uint32_t s2 = 0;
+	addr_t a;
+	for (a=as; a<ae; a++)
+	{
+		s1 = (s1 + img->map[a]) % 65521;
+		s2 = (s2 + s1) % 65521;
+	}
+
+	a32 = (s2 << 16) | s1;
+	*result = &a32;
+}
+
+void crc17(addr_t as, addr_t ae, image_t * img, uint8_t * byte_len, void ** result)
+{
+	static uint32_t crc17 = 0x172342ff;
+	//printf("crc17 %x %x\n", as, ae);
+	*result = &crc17;
+}
+
+
+checksum_fp_t checksum_fps[] =
+{
+	sum32,
+	adler32,
+	crc17,
+	NULL
+};
+
+char * checksum_name[] =
+{
+	"sum32",
+	"adler32",
+	"crc17"
+};
+
+void find_checksum(
+                   image_t * img,
+                   uint8_t clen,
+                   void * result, 
+                   uint32_t cindex,
+                   addr_t as,
+                   addr_t ae)
+{
+	addr_t a;
+	for (a=0; a < img->size; a++)
+	{
+		if (!memcmp(&img->map[a], result, clen))
+		{
+			LOG(LOG_INFO, "FOUND [0x%8.8x-0x%8.8x] checksum. %d bytes at 0x%8.8x: ", as, ae, clen, a);
+			int i;
+			for (i=0; i<clen; i++)
+				LOG(LOG_INFO, "%2.2x", img->map[a+i]);
+			LOG(LOG_INFO, " algorithm: %s\n", checksum_name[cindex]);
+		}
+	}
+}
+
+void do_checksum(addr_t as, addr_t ae, image_t * img)
+{
+	checksum_fp_t * fp;
+	fp = checksum_fps;
+	uint8_t clen;
+	void * result;
+	uint32_t cindex = 0;
+	while (*fp)
+	{
+		(*fp)(as, ae, img, &clen, &result);
+		find_checksum(img, clen, result, cindex, as, ae);
+		fp++;
+		cindex++;
+	}
+}
 
 void map_file(image_t * img)
 {
@@ -83,7 +174,11 @@ void spread_addresses(addr_t ** al, uint32_t width)
 	p = *al;
 	for (i=0; i<n_addr; i++, p++)
 		for (j=1; j<width; j++)
+		{
 			add_address(al, *p + j);
+			if (*p >= j )
+				add_address(al, *p - j);
+		}
 }
 
 void scan_img_for_addresses(image_t * img, addr_t ** al)
@@ -105,7 +200,7 @@ void scan_img_for_addresses(image_t * img, addr_t ** al)
 		{
 			if (do_dump == 1)
 			{
-				LOG(LOG_SCAN, "found address 0x%8.8x after %5.d 0xff\n", a, sequence);
+				LOG(LOG_SCAN, "interesting address 0x%8.8x after %5.d 0xff\n", a, sequence);
 				add_address(al, a);
 				do_dump = 0;
 			}
@@ -128,7 +223,7 @@ void scan_img_for_addresses(image_t * img, addr_t ** al)
 		{
 			if (do_dump == 1)
 			{
-				LOG(LOG_SCAN, "found address 0x%8.8x after %5.d 0x00\n", a, sequence);
+				LOG(LOG_SCAN, "interesting address 0x%8.8x after %5.d 0x00\n", a, sequence);
 				add_address(al, a);
 				do_dump = 0;
 			}
@@ -155,22 +250,19 @@ int main(int argc, char ** argv){
 
 	int as; /* start address */
 	int ae; /*   end address */
-	for (as=0; as<MAX_ADDRESSES; as++)
+	/* O(n^2) */
+	for (as=0; address_list[as] != NO_ADDRESS; as++)
 	{
-		if (address_list[as] == NO_ADDRESS)
-			break;
-
-		for (ae=0; ae<MAX_ADDRESSES; ae++)
+		for (ae=0; address_list[ae] != NO_ADDRESS; ae++)
 		{
-			if (address_list[ae] == NO_ADDRESS)
-				break;
-
-			if (address_list[ae] > address_list[as])
+			/* FIXME we could use another parameter than ADDRESS_SPREAD */
+			if (address_list[ae] > address_list[as] + ADDRESS_SPREAD)
 			{
 				LOG(LOG_ADDR,
 				    "checksumming 0x%8.8x to 0x%8.8x\n",
 				    address_list[as],
 				    address_list[ae]);
+				do_checksum(address_list[as], address_list[ae], &img);
 			}
 		}
 	}
