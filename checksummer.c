@@ -51,12 +51,33 @@ typedef void(*checksum_fp_t)
 
 void sum32(addr_t as, addr_t ae, image_t * img, uint8_t * byte_len, void ** result)
 {
-	static uint32_t sum32;
+	static uint32_t sum32 = 0;
 	*byte_len = 4;
+
+	uint32_t s32 = 0;
+
+	static uint32_t cached_s32 = 0;
+	static addr_t   cached_as = 0xffffffff;
+	static addr_t   cached_ae = 0xffffffff;
+
 	addr_t a;
-	sum32 = 0;
-	for (a=as; a<ae; a++)
-		sum32 += img->map[a];
+	if ((as == cached_as) && (ae > cached_ae))
+	{
+		a   = cached_ae;
+		s32 = cached_s32;
+	}
+	else
+		a = as;
+
+	for (; a<ae; a++)
+		s32 += img->map[a];
+
+	sum32 = s32;
+
+	cached_s32 = s32;
+	cached_as = as;
+	cached_ae = ae;
+
 	*result = &sum32;
 }
 
@@ -64,16 +85,38 @@ void adler32(addr_t as, addr_t ae, image_t * img, uint8_t * byte_len, void ** re
 {
 	static uint32_t a32 = 0;
 	*byte_len = 4;
+
 	uint32_t s1 = 1;
 	uint32_t s2 = 0;
+
+	static uint32_t cached_s1 = 1;
+	static uint32_t cached_s2 = 0;
+	static addr_t   cached_as = 0xffffffff;
+	static addr_t   cached_ae = 0xffffffff;
+
 	addr_t a;
-	for (a=as; a<ae; a++)
+	if ((as == cached_as) && (ae > cached_ae))
+	{
+		a  = cached_ae;
+		s1 = cached_s1;
+		s2 = cached_s2;
+	}
+	else
+		a = as;
+
+	for (; a<ae; a++)
 	{
 		s1 = (s1 + img->map[a]) % 65521;
 		s2 = (s2 + s1) % 65521;
 	}
 
 	a32 = (s2 << 16) | s1;
+
+	cached_s1 = s1;
+	cached_s2 = s2;
+	cached_as = as;
+	cached_ae = ae;
+
 	*result = &a32;
 }
 
@@ -89,7 +132,7 @@ checksum_fp_t checksum_fps[] =
 {
 	sum32,
 	adler32,
-	crc17,
+//	crc17,
 	NULL
 };
 
