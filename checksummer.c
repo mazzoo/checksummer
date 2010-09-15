@@ -199,12 +199,14 @@ void find_checksum(
                    addr_t as,
                    addr_t ae)
 {
-	int add_to_cache = 0;
-	addr_t found = 0;
 
 	addr_t a = 0;
 
 #ifdef CACHING
+	int add_to_cache = 0;
+
+	addr_t found = 0;
+
 	if (clen == 4 && (*(uint32_t *) result))
 		a = find_checksum_in_cache4(*(uint32_t *) result);
 
@@ -214,18 +216,42 @@ void find_checksum(
 		return;
 #endif
 
+	uint8_t * p = &img->map[a];
 	for (; a < img->size; a++)
 	{
-		if (!memcmp(&img->map[a], result, clen))
+		/* FIXME: this if..if..if..if construct reduces search time from
+		 *        160s (memcmp) to 10s
+		 *        the obvious downside: it's static for 32bit CRCs
+		 *        replace with some while() construct
+		 */
+		if (*p == ((uint8_t *)result)[0])
 		{
+		p++;
+		if (*p == ((uint8_t *)result)[1])
+		{
+		p++;
+		if (*p == ((uint8_t *)result)[2])
+		{
+		p++;
+		if (*p == ((uint8_t *)result)[3])
+		{
+#ifdef CACHING
 			if (!found)
 				found = a;
+#endif
 			LOG(LOG_INFO, "FOUND [0x%8.8x-0x%8.8x] checksum. %d bytes at 0x%8.8x: ", as, ae, clen, a);
 			int i;
 			for (i=0; i<clen; i++)
 				LOG(LOG_INFO, "%2.2x", img->map[a+i]);
 			LOG(LOG_INFO, " algorithm: %s\n", checksum_name[cindex]);
 		}
+		p--;
+		}
+		p--;
+		}
+		p--;
+		}
+		p++;
 	}
 
 #ifdef CACHING
