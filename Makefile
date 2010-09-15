@@ -2,6 +2,7 @@ CFLAGS=-Wall -O2
 #CFLAGS+=-ggdb
 #CFLAGS+=-funroll-loops
 CFLAGS+=-funroll-all-loops
+#CFLAGS+=-DCACHING
 
 all:checksummer
 clean:
