@@ -36,6 +36,9 @@
               }\
             }
 
+#define likely(x)   __builtin_expect(!!(x), 1)
+#define unlikely(x) __builtin_expect(!!(x), 0)
+
 typedef uint32_t addr_t;
 
 addr_t * address_list;
@@ -219,21 +222,28 @@ void find_checksum(
 	uint8_t * p = &img->map[a];
 	for (; a < img->size; a++)
 	{
+
+#if 0
+		asm (
+			"\tnop \n"
+			"\tnop \n"
+			"\tnop \n"
+			"\tnop \n"
+		);
+#endif
+
 		/* FIXME: this if..if..if..if construct reduces search time from
 		 *        160s (memcmp) to 10s
 		 *        the obvious downside: it's static for 32bit CRCs
 		 *        replace with some while() construct
 		 */
-		if (*p == ((uint8_t *)result)[0])
+		if (unlikely(*(p+0) == ((uint8_t *)result)[0]))
 		{
-		p++;
-		if (*p == ((uint8_t *)result)[1])
+		if (unlikely(*(p+1) == ((uint8_t *)result)[1]))
 		{
-		p++;
-		if (*p == ((uint8_t *)result)[2])
+		if (unlikely(*(p+2) == ((uint8_t *)result)[2]))
 		{
-		p++;
-		if (*p == ((uint8_t *)result)[3])
+		if (unlikely(*(p+3) == ((uint8_t *)result)[3]))
 		{
 #ifdef CACHING
 			if (!found)
@@ -244,12 +254,13 @@ void find_checksum(
 			for (i=0; i<clen; i++)
 				LOG(LOG_INFO, "%2.2x", img->map[a+i]);
 			LOG(LOG_INFO, " algorithm: %s\n", checksum_name[cindex]);
+#ifdef EXIT_AFTER_1ST_CHECKSUM_FOUND
+			/* for performance measurements */
+			exit(0);
+#endif
 		}
-		p--;
 		}
-		p--;
 		}
-		p--;
 		}
 		p++;
 	}
