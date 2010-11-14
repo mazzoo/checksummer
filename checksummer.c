@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "checksummer.h"
 
 #define ADDRESS_SPREAD        64
 #define SEQ_THRESHOLD         64
@@ -39,15 +40,7 @@
 #define likely(x)   __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
-typedef uint32_t addr_t;
-
 addr_t * address_list;
-
-typedef struct image_s{
-	char    * fname;
-	uint8_t * map;
-	addr_t    size;
-} image_t;
 
 typedef void(*checksum_fp_t)
 	(addr_t as, addr_t ae, image_t * img, uint8_t * byte_len, void ** result);
@@ -194,6 +187,36 @@ addr_t find_checksum_in_cache4(uint32_t c)
 	return 0;
 }
 
+void find_checksum2(
+                   image_t * img,
+                   uint8_t clen,
+                   void * result, 
+                   uint32_t cindex,
+                   addr_t as,
+                   addr_t ae)
+{
+	int i;
+	indexer_t letter = img->indexer[((uint8_t *)result)[0]];
+	for (i=0; i < letter.next_free; i++)
+	{
+		uint8_t * p = &img->map[letter.offset[i]];
+		if (unlikely(*(p+1) == ((uint8_t *)result)[1]))
+		{
+		if (unlikely(*(p+2) == ((uint8_t *)result)[2]))
+		{
+		if (unlikely(*(p+3) == ((uint8_t *)result)[3]))
+		{
+			LOG(LOG_INFO, "FOUND [0x%8.8x-0x%8.8x] checksum. %d bytes at 0x%8.8x: ", as, ae, clen, letter.offset[i]);
+			int j;
+			for (j=0; j<clen; j++)
+				LOG(LOG_INFO, "%2.2x", img->map[letter.offset[i]+j]);
+			LOG(LOG_INFO, " algorithm: %s\n", checksum_name[cindex]);
+		}
+		}
+		}
+	}
+}
+
 void find_checksum(
                    image_t * img,
                    uint8_t clen,
@@ -281,7 +304,8 @@ void do_checksum(addr_t as, addr_t ae, image_t * img)
 	while (*fp)
 	{
 		(*fp)(as, ae, img, &clen, &result);
-		find_checksum(img, clen, result, cindex, as, ae);
+//		find_checksum(img, clen, result, cindex, as, ae);
+		find_checksum2(img, clen, result, cindex, as, ae);
 		fp++;
 		cindex++;
 	}
@@ -349,7 +373,7 @@ void scan_img_for_addresses(image_t * img, addr_t ** al)
 		{
 			if (do_dump == 1)
 			{
-				LOG(LOG_SCAN, "interesting address 0x%8.8x after %5.d 0xff\n", a, sequence);
+				LOG(LOG_SCAN, "interesting address 0x%8.8x after %6d 0xff\n", a, sequence);
 				add_address(al, a);
 				do_dump = 0;
 			}
@@ -372,7 +396,7 @@ void scan_img_for_addresses(image_t * img, addr_t ** al)
 		{
 			if (do_dump == 1)
 			{
-				LOG(LOG_SCAN, "interesting address 0x%8.8x after %5.d 0x00\n", a, sequence);
+				LOG(LOG_SCAN, "interesting address 0x%8.8x after %6d 0x00\n", a, sequence);
 				add_address(al, a);
 				do_dump = 0;
 			}
@@ -392,10 +416,16 @@ int main(int argc, char ** argv){
 	address_list = malloc(MAX_ADDRESSES * sizeof(*address_list));
 	memset(address_list, NO_ADDRESS, MAX_ADDRESSES * sizeof(*address_list));
 
+	init_indexer();
+
 	add_address(&address_list, 0);
 	scan_img_for_addresses(&img, &address_list);
 
 	spread_addresses(&address_list, ADDRESS_SPREAD);
+
+	printf("creating index ...\n");fflush(stdout);
+	create_index(&img);
+	printf("creating index done.\n");fflush(stdout);
 
 	int as; /* start address */
 	int ae; /*   end address */
