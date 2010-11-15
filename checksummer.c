@@ -16,27 +16,6 @@
 #define MAX_ADDRESSES  1024*1024
 #define NO_ADDRESS    0xffffffff
 
-#define LOG_INFO      0x01
-#define LOG_ERROR     0x02
-#define LOG_ADDR      0x04
-#define LOG_SCAN      0x08
-
-#define LOG_MASK   (\
-                     LOG_INFO      |    \
-                     LOG_ERROR     |    \
-                  /* LOG_ADDR      | */ \
-                     LOG_SCAN      |    \
-                     0\
-                   )
-#define LOG(level, fmt, args...)\
-            {\
-              if (level & LOG_MASK)\
-              {\
-                printf(fmt, ##args);\
-                fflush(stdout);\
-              }\
-            }
-
 #define likely(x)   __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
@@ -116,27 +95,18 @@ void adler32(addr_t as, addr_t ae, image_t * img, uint8_t * byte_len, void ** re
 	*result = &a32;
 }
 
-void crc17(addr_t as, addr_t ae, image_t * img, uint8_t * byte_len, void ** result)
-{
-	static uint32_t crc17 = 0x172342ff;
-	//printf("crc17 %x %x\n", as, ae);
-	*result = &crc17;
-}
-
 
 checksum_fp_t checksum_fps[] =
 {
 	sum32,
 	adler32,
-//	crc17,
 	NULL
 };
 
 char * checksum_name[] =
 {
 	"sum32",
-	"adler32",
-	"crc17"
+	"adler32"
 };
 
 typedef struct checksum_cache_entry_s
@@ -423,9 +393,9 @@ int main(int argc, char ** argv){
 
 	spread_addresses(&address_list, ADDRESS_SPREAD);
 
-	printf("creating index ...\n");fflush(stdout);
+	LOG(LOG_INDEX, "creating index ...\n");fflush(stdout);
 	create_index(&img);
-	printf("creating index done.\n");fflush(stdout);
+	LOG(LOG_INDEX, "creating index done.\n");fflush(stdout);
 
 	int as; /* start address */
 	int ae; /*   end address */

@@ -33,7 +33,7 @@ void create_index(image_t * img)
 		indexer_t * letter = &indexer[img->map[a]];
 		if (letter->next_free == letter->size)
 		{
-			printf("  realloc for letter 0x%2.2x\n", img->map[a]);
+			LOG(LOG_INDEX, "  realloc for letter 0x%2.2x\n", img->map[a]);
 			letter->offset = realloc(
 				letter->offset,
 				(letter->size + INDICES_PER_LETTER) * sizeof(addr_t)
@@ -44,14 +44,14 @@ void create_index(image_t * img)
 		letter->next_free++;
 	}
 
-	printf(" letter distribution table [0x00 - 0xff]:\n\n");
+	LOG(LOG_INDEX, " letter distribution table [0x00 - 0xff]:\n\n");
 	int i;
 	for (i=0; i<256; i++)
 	{
-		printf("%7d ", indexer[i].next_free);
+		LOG(LOG_INDEX, "%7d ", indexer[i].next_free);
 		if((i%8)==7)
-			printf("\n");
+			LOG(LOG_INDEX, "\n");
 	}
-	printf("\n");
+	LOG(LOG_INDEX, "\n");
 	img->indexer = indexer;
 }

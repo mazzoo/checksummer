@@ -3,6 +3,29 @@
 
 #include <stdint.h>
 
+#define LOG_INFO      0x01
+#define LOG_ERROR     0x02
+#define LOG_ADDR      0x04
+#define LOG_SCAN      0x08
+#define LOG_INDEX     0x10
+
+#define LOG_MASK   (\
+                     LOG_INFO      |    \
+                     LOG_ERROR     |    \
+                  /* LOG_ADDR      | */ \
+                     LOG_SCAN      |    \
+                     LOG_INDEX     |    \
+                     0\
+                   )
+#define LOG(level, fmt, args...)\
+            {\
+              if (level & LOG_MASK)\
+              {\
+                printf(fmt, ##args);\
+                fflush(stdout);\
+              }\
+            }
+
 typedef uint32_t addr_t;
 
 typedef struct indexer_s {
