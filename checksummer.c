@@ -109,54 +109,6 @@ char * checksum_name[] =
 	"adler32"
 };
 
-typedef struct checksum_cache_entry_s
-{
-	uint32_t sum;
-	addr_t first_addr; /* = 0 if not found, first occurence otherwise */
-	struct checksum_cache_entry_s * next;
-} checksum_cache_entry_t;
-
-checksum_cache_entry_t * checksum_cache4 = NULL;
-
-void add_checksum_to_cache4(uint32_t c, addr_t found)
-{
-	checksum_cache_entry_t * p;
-	checksum_cache_entry_t * ptmp;
-	ptmp = checksum_cache4;
-
-	p = malloc(sizeof(*p));
-	checksum_cache4 = p;
-
-	if (ptmp)
-	{
-		p->next = ptmp;
-	}
-	else
-	{
-		p->next = NULL;
-	}
-
-	p->sum = c;
-	p->first_addr = found;
-	//LOG(LOG_INFO, "new @%8.8x: %8.8x\n", found, c);
-}
-
-addr_t find_checksum_in_cache4(uint32_t c)
-{
-	checksum_cache_entry_t * p;
-	p = checksum_cache4;
-	while (p)
-	{
-		if (p->sum == c)
-		{
-			//LOG(LOG_INFO, "c4\n");
-			return p->first_addr;
-		}
-		p = p->next;
-	}
-	return 0;
-}
-
 void find_checksum2(
                    image_t * img,
                    uint8_t clen,
@@ -198,20 +150,6 @@ void find_checksum(
 
 	addr_t a = 0;
 
-#ifdef CACHING
-	int add_to_cache = 0;
-
-	addr_t found = 0;
-
-	if (clen == 4 && (*(uint32_t *) result))
-		a = find_checksum_in_cache4(*(uint32_t *) result);
-
-	if (!a)
-		add_to_cache = 1;
-	else
-		return;
-#endif
-
 	uint8_t * p = &img->map[a];
 	for (; a < img->size; a++)
 	{
@@ -238,10 +176,6 @@ void find_checksum(
 		{
 		if (unlikely(*(p+3) == ((uint8_t *)result)[3]))
 		{
-#ifdef CACHING
-			if (!found)
-				found = a;
-#endif
 			LOG(LOG_INFO, "FOUND [0x%8.8x-0x%8.8x] checksum. %d bytes at 0x%8.8x: ", as, ae, clen, a);
 			int i;
 			for (i=0; i<clen; i++)
@@ -257,11 +191,6 @@ void find_checksum(
 		}
 		p++;
 	}
-
-#ifdef CACHING
-	if (add_to_cache && clen == 4)
-		add_checksum_to_cache4(*(uint32_t *) result, found);
-#endif
 }
 
 void do_checksum(addr_t as, addr_t ae, image_t * img)

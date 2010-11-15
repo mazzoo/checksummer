@@ -3,7 +3,7 @@ CFLAGS=-Wall -O2
 #CFLAGS+=-ggdb
 CFLAGS+=-funroll-loops
 #CFLAGS+=-funroll-all-loops
-#CFLAGS+=-DCACHING
+CFLAGS+=-DCACHING
 #CFLAGS+=-DEXIT_AFTER_1ST_CHECKSUM_FOUND
 
 checksummer:checksummer.o indexer.c
