@@ -288,6 +288,8 @@ void map_file(image_t * img)
 	f = open(img->fname, O_RDONLY);
 	ret = lseek(f, 0, SEEK_END);
 	img->size = ret;
+	LOG(LOG_INFO, "mapping file %s size = %d/0x%x\n",
+		img->fname, img->size, img->size);
 	img->map = mmap(NULL, ret, PROT_READ, MAP_SHARED, f, 0);
 }
 
@@ -313,15 +315,22 @@ void spread_addresses(addr_t ** al, uint32_t width)
 		n_addr++;
 		p++;
 	}
+	int addr_count = n_addr;
 	int i, j;
 	p = *al;
 	for (i=0; i<n_addr; i++, p++)
 		for (j=1; j<width; j++)
 		{
 			add_address(al, *p + j);
+			addr_count++;
 			if (*p >= j )
+			{
 				add_address(al, *p - j);
+				addr_count++;
+			}
 		}
+
+	LOG(LOG_INFO, "spread to a total of %d addresses\n", addr_count);
 }
 
 void scan_img_for_addresses(image_t * img, addr_t ** al)
@@ -330,6 +339,7 @@ void scan_img_for_addresses(image_t * img, addr_t ** al)
 	addr_t a;
 	int do_dump;
 	addr_t sequence;
+	uint32_t addr_count = 0;
 
 	/* scanning for 0xFF->0xXX transitions */
 	p        = img->map;
@@ -345,6 +355,7 @@ void scan_img_for_addresses(image_t * img, addr_t ** al)
 			{
 				LOG(LOG_SCAN, "interesting address 0x%8.8x after %6d 0xff\n", a, sequence);
 				add_address(al, a);
+				addr_count++;
 				do_dump = 0;
 			}
 			sequence = 0;
@@ -368,6 +379,7 @@ void scan_img_for_addresses(image_t * img, addr_t ** al)
 			{
 				LOG(LOG_SCAN, "interesting address 0x%8.8x after %6d 0x00\n", a, sequence);
 				add_address(al, a);
+				addr_count++;
 				do_dump = 0;
 			}
 			sequence = 0;
@@ -376,6 +388,7 @@ void scan_img_for_addresses(image_t * img, addr_t ** al)
 			do_dump = 1;
 		p++;
 	}
+	LOG(LOG_INFO, "using %u interesting addresses\n", addr_count);
 }
 
 int main(int argc, char ** argv){
