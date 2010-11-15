@@ -109,7 +109,7 @@ char * checksum_name[] =
 	"adler32"
 };
 
-void find_checksum2(
+void find_checksum(
                    image_t * img,
                    uint8_t clen,
                    void * result, 
@@ -139,60 +139,6 @@ void find_checksum2(
 	}
 }
 
-void find_checksum(
-                   image_t * img,
-                   uint8_t clen,
-                   void * result, 
-                   uint32_t cindex,
-                   addr_t as,
-                   addr_t ae)
-{
-
-	addr_t a = 0;
-
-	uint8_t * p = &img->map[a];
-	for (; a < img->size; a++)
-	{
-
-#if 0
-		asm (
-			"\tnop \n"
-			"\tnop \n"
-			"\tnop \n"
-			"\tnop \n"
-		);
-#endif
-
-		/* FIXME: this if..if..if..if construct reduces search time from
-		 *        160s (memcmp) to 10s
-		 *        the obvious downside: it's static for 32bit CRCs
-		 *        replace with some while() construct
-		 */
-		if (unlikely(*(p+0) == ((uint8_t *)result)[0]))
-		{
-		if (unlikely(*(p+1) == ((uint8_t *)result)[1]))
-		{
-		if (unlikely(*(p+2) == ((uint8_t *)result)[2]))
-		{
-		if (unlikely(*(p+3) == ((uint8_t *)result)[3]))
-		{
-			LOG(LOG_INFO, "FOUND [0x%8.8x-0x%8.8x] checksum. %d bytes at 0x%8.8x: ", as, ae, clen, a);
-			int i;
-			for (i=0; i<clen; i++)
-				LOG(LOG_INFO, "%2.2x", img->map[a+i]);
-			LOG(LOG_INFO, " algorithm: %s\n", checksum_name[cindex]);
-#ifdef EXIT_AFTER_1ST_CHECKSUM_FOUND
-			/* for performance measurements */
-			exit(0);
-#endif
-		}
-		}
-		}
-		}
-		p++;
-	}
-}
-
 void do_checksum(addr_t as, addr_t ae, image_t * img)
 {
 	checksum_fp_t * fp;
@@ -203,8 +149,7 @@ void do_checksum(addr_t as, addr_t ae, image_t * img)
 	while (*fp)
 	{
 		(*fp)(as, ae, img, &clen, &result);
-//		find_checksum(img, clen, result, cindex, as, ae);
-		find_checksum2(img, clen, result, cindex, as, ae);
+		find_checksum(img, clen, result, cindex, as, ae);
 		fp++;
 		cindex++;
 	}
